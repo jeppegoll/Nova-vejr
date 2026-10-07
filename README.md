@@ -4,7 +4,7 @@ Hellerup Kyst – vind og bølger
 
 En enkel webside, der viser prognosen for vind og bølger på Øresund ud for Hellerup Havn de næste 50 timer. Den er lavet til kajakroere og andre, der skal ud på vandet, men den giver ingen anbefalinger. Hver enkelt må selv vurdere, hvad de kan klare.
 
-Se siden: https://BRUGERNAVN.github.io/hellerup-kyst/
+Se siden: https://jeppegoll.github.io/hellerup-kyst/
 
 Hvad siden viser
 Lige nu: vindhastighed og retning, vindstød, Beaufort-styrke, bølgehøjde og bølgeretning, vand- og lufttemperatur samt vejret.
