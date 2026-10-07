@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hellerup Kyst · vind og bølger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Source+Sans+3:wght@400;600&display=swap">
+<style>
+/* Hellerup Kyst – vind og bølger. Henter prognosen direkte fra MET Norway, hver gang siden åbnes. */
+:root{
+  --bg:#eef2f4; --panel:#ffffff; --ink:#14232e; --muted:#5b6c77; --line:#d3dce1;
+  --wind:#1f5f8b; --gust:#9cbcd3; --wave:#2a8c86; --wavefill:#bfe0dc; --on:#b4572a; --off:#3d7a3d; --night:#dfe6ec;
+  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0e171d; --panel:#16232c; --ink:#e3ecf0; --muted:#8fa3ae; --line:#2a3b46;
+  --wind:#7fb6dc; --gust:#3a5a72; --wave:#5cc4bc; --wavefill:#1c4a47; --on:#e48a5c; --off:#86c286; --night:#0f1a21; color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
+.wrap{max-width:860px;margin:0 auto;padding-inline:16px;padding-block:20px 40px;display:flex;flex-direction:column;gap:22px}
+header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:6px 16px}
+h1{font-family:var(--display);font-weight:700;font-size:2.3rem;line-height:1;margin:0;letter-spacing:.01em}
+h2{font-family:var(--display);font-weight:600;font-size:1.35rem;margin:0}
+.meta{color:var(--muted);font-size:.85rem}
+.meta b{color:var(--ink);font-weight:600}
+@media (min-width:621px){.meta{text-align:right}}
+.label{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.status{padding:10px 14px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--muted)}
+.status.err{border-color:var(--on);color:var(--on);font-weight:600}
+.now{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.cell{background:var(--panel);padding:14px 14px 12px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.big{font-family:var(--display);font-weight:600;font-size:2.4rem;line-height:1;font-variant-numeric:tabular-nums}
+.big small{font-size:1rem;font-weight:500;color:var(--muted);margin-left:3px}
+.sub{font-size:.85rem;color:var(--muted)}
+.sub b{color:var(--ink);font-weight:600}
+.arrow{display:inline-block;vertical-align:-3px}
+.pill{display:inline-block;font-size:.75rem;font-weight:600;padding:1px 8px;border-radius:99px;border:1px solid currentColor}
+.pill.on{color:var(--on)} .pill.off{color:var(--off)} .pill.side{color:var(--muted)}
+section{display:flex;flex-direction:column;gap:8px}
+.legend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:.82rem;color:var(--muted)}
+.legend i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:5px}
+.chartbox{background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow-x:auto}
+.chartbox svg{display:block;min-width:640px;width:100%;height:auto}
+.fold{display:flex;flex-direction:column;gap:8px}
+.fold summary{list-style:none;cursor:pointer;display:flex;align-items:center;flex-wrap:wrap;gap:4px 12px;padding:10px 14px;background:var(--panel);border:1px solid var(--line);border-radius:6px}
+.fold summary::-webkit-details-marker{display:none}
+.fold summary:hover{border-color:var(--muted)}
+.fold summary:focus-visible{outline:2px solid var(--wind);outline-offset:2px}
+.chev{width:9px;height:9px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(-45deg);transition:transform .15s}
+.fold[open] .chev{transform:rotate(45deg)}
+@media (prefers-reduced-motion:reduce){.chev{transition:none}}
+.tbl{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:6px}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:.9rem}
+th,td{padding:6px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+th{font-size:.7rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600;background:var(--panel)}
+td:first-child,th:first-child{text-align:left}
+td.dir,th.dir,td.wx,th.wx{text-align:left}
+tr.day td{background:var(--bg);font-family:var(--display);font-weight:600;font-size:1rem;text-align:left;letter-spacing:.02em}
+.sun{font-family:var(--body);font-weight:400;font-size:.8rem;color:var(--muted);margin-left:12px;letter-spacing:0}
+footer{font-size:.82rem;color:var(--muted);max-width:65ch;display:flex;flex-direction:column;gap:6px}
+footer p{margin:0}
+footer a{color:var(--wind)}
+@media (max-width:620px){.now{grid-template-columns:repeat(2,minmax(0,1fr))}.big{font-size:2rem}h1{font-size:1.9rem}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="label">Øresund · ud for Hellerup Havn</div>
+      <h1>Hellerup Kyst</h1>
+    </div>
+    <div class="meta" id="stamp">Henter prognose …</div>
+  </header>
+
+  <div class="status" id="status">Henter den nyeste prognose fra MET Norway …</div>
+
+  <div class="now" id="now" hidden></div>
+
+  <section id="chartsec" hidden>
+    <h2 id="charttitle">Næste timer</h2>
+    <div class="legend">
+      <span><i style="background:var(--wind)"></i>Middelvind m/s</span>
+      <span><i style="background:var(--gust);height:8px"></i>Vindstød m/s</span>
+      <span><i style="background:var(--wave)"></i>Bølgehøjde m</span>
+      <span><i style="background:var(--night);height:8px;border:1px solid var(--line)"></i>Mørke</span>
+      <span>Pile viser hvor vinden blæser hen</span>
+    </div>
+    <div class="chartbox"><svg id="chart" viewBox="0 0 820 380" role="img" aria-label="Graf over vind og bølger"></svg></div>
+  </section>
+
+  <details class="fold" id="tablesec" hidden>
+    <summary><span class="chev" aria-hidden="true"></span><h2>Time for time</h2><span class="sub">Alle tal for prognoseperioden</span></summary>
+    <div class="tbl"><table id="log"><thead><tr>
+      <th>Tid</th><th>Vind</th><th>Stød</th><th class="dir">Retning</th><th>Bølger</th><th class="dir">Bølger fra</th><th>Vand</th><th>Luft</th><th class="wx">Vejr</th>
+    </tr></thead><tbody></tbody></table></div>
+  </details>
+
+  <footer>
+    <p>Siden viser vejrprognosen. Den siger ikke, om det er sikkert at tage på vandet. Vurder selv forholdene, før du tager ud.</p>
+    <p>Data: <a href="https://api.met.no/" target="_blank" rel="noopener">MET Norway</a> (Meteorologisk institutt), CC BY 4.0. Bølger og vandtemperatur fra oceanforecast ved 55,73° N 12,62° Ø, vind, luft og vejr fra locationforecast ved Hellerup. Prognosen hentes, hver gang siden åbnes, og igen hver halve time, mens den står åben.</p>
+    <p>Pålandsvind (fra øst) blæser ind mod stranden, fralandsvind (fra vest) blæser ud fra land. Se også <a href="https://www.dmi.dk/hav-og-is" target="_blank" rel="noopener">DMI Hav og is</a>.</p>
+  </footer>
+</div>
+
+<script>
+(function(){
+const LOC_URL="https://api.met.no/weatherapi/locationforecast/2.0/complete?lat=55.73&lon=12.58";
+const SEA_URL="https://api.met.no/weatherapi/oceanforecast/2.0/complete?lat=55.73&lon=12.62";
+const HOURS=50, TZ="Europe/Copenhagen";
+
+const fHour=d=>d.toLocaleTimeString("da-DK",{timeZone:TZ,hour:"2-digit",minute:"2-digit"});
+const fDay=d=>d.toLocaleDateString("da-DK",{timeZone:TZ,weekday:"long",day:"numeric",month:"long"});
+const dayKey=d=>d.toLocaleDateString("da-DK",{timeZone:TZ});
+const hourNum=d=>+d.toLocaleString("en-GB",{timeZone:TZ,hour:"2-digit",hour12:false});
+const dk=n=>n==null||isNaN(n)?"–":n.toLocaleString("da-DK",{minimumFractionDigits:1,maximumFractionDigits:1});
+const cap=s=>s[0].toUpperCase()+s.slice(1);
+
+const COMP=["N","NNØ","NØ","ØNØ","Ø","ØSØ","SØ","SSØ","S","SSV","SV","VSV","V","VNV","NV","NNV"];
+const comp=d=>d==null?"–":COMP[Math.round(((d%360)+360)%360/22.5)%16];
+const BF=[[0.2,0,"stille"],[1.5,1,"næsten stille"],[3.3,2,"svag vind"],[5.4,3,"let vind"],[7.9,4,"jævn vind"],[10.7,5,"frisk vind"],[13.8,6,"hård vind"],[17.1,7,"stiv kuling"],[20.7,8,"hård kuling"],[24.4,9,"stormende kuling"],[28.4,10,"storm"],[32.6,11,"stærk storm"],[1e9,12,"orkan"]];
+const beaufort=v=>BF.find(b=>v<=b[0]);
+// Kysten ved Hellerup vender mod øst
+function shore(d){d=((d%360)+360)%360;
+  if(d>=45&&d<=135) return ["on","Pålandsvind"];
+  if(d>=225&&d<=315) return ["off","Fralandsvind"];
+  return ["side","Langs kysten"];}
+const SYM={clearsky:"Klart",fair:"Let skyet",partlycloudy:"Delvist skyet",cloudy:"Overskyet",fog:"Tåge",
+  lightrain:"Let regn",rain:"Regn",heavyrain:"Kraftig regn",lightrainshowers:"Lette regnbyger",rainshowers:"Regnbyger",heavyrainshowers:"Kraftige regnbyger",
+  lightrainandthunder:"Let regn og torden",rainandthunder:"Regn og torden",heavyrainandthunder:"Kraftig regn og torden",
+  lightrainshowersandthunder:"Regnbyger og torden",rainshowersandthunder:"Regnbyger og torden",heavyrainshowersandthunder:"Kraftige byger og torden",
+  lightsleet:"Let slud",sleet:"Slud",heavysleet:"Kraftig slud",lightsleetshowers:"Lette sludbyger",sleetshowers:"Sludbyger",heavysleetshowers:"Kraftige sludbyger",
+  lightsnow:"Let sne",snow:"Sne",heavysnow:"Kraftig sne",lightsnowshowers:"Lette snebyger",snowshowers:"Snebyger",heavysnowshowers:"Kraftige snebyger"};
+const symName=s=>SYM[s]||SYM[s.replace(/and.*$/,"")]||"";
+
+// Solop- og solnedgang for Hellerup
+function sun(dayUTC){
+  const rad=Math.PI/180, lw=-12.58*rad, phi=55.73*rad, J1970=2440588, J2000=2451545, J0=0.0009, e=23.4397*rad, P=2*Math.PI;
+  const d=dayUTC/864e5-0.5+J1970-J2000, n=Math.round(d-J0-lw/P), ds=J0+lw/P+n;
+  const M=rad*(357.5291+0.98560028*ds), C=rad*(1.9148*Math.sin(M)+0.02*Math.sin(2*M)+0.0003*Math.sin(3*M));
+  const L=M+C+rad*102.9372+Math.PI, dec=Math.asin(Math.sin(e)*Math.sin(L));
+  const Jnoon=J2000+ds+0.0053*Math.sin(M)-0.0069*Math.sin(2*L);
+  const w=Math.acos((Math.sin(-0.833*rad)-Math.sin(phi)*Math.sin(dec))/(Math.cos(phi)*Math.cos(dec)));
+  const Jset=J2000+J0+(w+lw)/P+n+0.0053*Math.sin(M)-0.0069*Math.sin(2*L), Jrise=Jnoon-(Jset-Jnoon);
+  const fj=j=>new Date((j+0.5-J1970)*864e5);
+  return {rise:fj(Jrise),set:fj(Jset)};
+}
+// Føles som: vindafkøling ved luft ≤ 10 °C og vind over 1,3 m/s
+function feels(air,wind){const v=wind*3.6;
+  if(air>10||v<=4.8) return air;
+  const p=Math.pow(v,0.16); return 13.12+0.6215*air-11.37*p+0.3965*air*p;}
+
+function arrow(fromDeg,size,color){
+  return `<svg class="arrow" width="${size}" height="${size}" viewBox="-10 -10 20 20" aria-hidden="true"><g transform="rotate(${fromDeg+180})"><path d="M0 -8 L5 4 L0 1.5 L-5 4 Z" fill="${color}"/></g></svg>`;
+}
+
+async function getJSON(url){
+  const r=await fetch(url,{headers:{Accept:"application/json"}});
+  if(!r.ok) throw new Error("HTTP "+r.status);
+  return r.json();
+}
+
+function buildRows(loc,sea){
+  const waves={};
+  for(const t of sea.properties.timeseries){const d=t.data.instant.details; waves[t.time]=d;}
+  const cut=Date.now()-36e5, rows=[], sunCache={};
+  for(const t of loc.properties.timeseries){
+    const time=new Date(t.time);
+    if(time.getTime()<=cut) continue;
+    const n1=t.data.next_1_hours; if(!n1) continue;
+    const w=waves[t.time]; if(!w) continue;
+    const d=t.data.instant.details;
+    const r={t:time,air:d.air_temperature,wind:d.wind_speed,gust:d.wind_speed_of_gust,wdir:d.wind_from_direction,
+      rain:n1.details?n1.details.precipitation_amount:0,sym:(n1.summary.symbol_code||"").replace(/_(day|night|polartwilight)$/,""),
+      wave:w.sea_surface_wave_height,vdir:w.sea_surface_wave_from_direction,water:w.sea_water_temperature};
+    r.feel=feels(r.air,r.wind);
+    const k=time.toLocaleDateString("en-CA",{timeZone:TZ});
+    r.sun=sunCache[k]||(sunCache[k]=sun(new Date(k+"T10:00:00Z")));
+    r.light=time>=r.sun.rise&&time<r.sun.set;
+    rows.push(r);
+    if(rows.length>=HOURS) break;
+  }
+  return rows;
+}
+
+function renderNow(n){
+  const bf=beaufort(n.wind), sh=shore(n.wdir), el=document.getElementById("now");
+  el.innerHTML=`
+   <div class="cell"><span class="label">Vind</span>
+     <span class="big">${dk(n.wind)}<small>m/s</small></span>
+     <span class="sub">${arrow(n.wdir,16,"var(--wind)")} fra <b>${comp(n.wdir)}</b> · stød ${dk(n.gust)}</span>
+     <span><span class="pill ${sh[0]}">${sh[1]}</span></span></div>
+   <div class="cell"><span class="label">Beaufort</span>
+     <span class="big">${bf[1]}</span>
+     <span class="sub">${bf[2]}</span></div>
+   <div class="cell"><span class="label">Bølgehøjde</span>
+     <span class="big">${dk(n.wave)}<small>m</small></span>
+     <span class="sub">fra <b>${comp(n.vdir)}</b></span></div>
+   <div class="cell"><span class="label">Vand / luft</span>
+     <span class="big">${dk(n.water)}<small>°C</small></span>
+     <span class="sub">luft <b>${dk(n.air)} °C</b>${Math.abs(n.feel-n.air)>=1?", føles "+dk(n.feel):""} · ${symName(n.sym)}</span></div>`;
+  el.hidden=false;
+}
+
+function renderChart(rows){
+  const svg=document.getElementById("chart");
+  const W=820,L=44,R=40,top=34,windH=150,gap=30,waveH=130;
+  const N=rows.length, x=i=>L+i*(W-L-R)/Math.max(1,N-1), cw=(W-L-R)/Math.max(1,N-1);
+  const wMax=Math.max(12,Math.ceil(Math.max(...rows.map(r=>r.gust||r.wind))/4)*4);
+  const vMax=Math.max(0.4,Math.ceil(Math.max(...rows.map(r=>r.wave))*10+1)/10);
+  const vStep=vMax>1.5?0.5:vMax>0.8?0.2:0.1;
+  const yW=v=>top+windH-v/wMax*windH;
+  const vTop=top+windH+gap, yV=v=>vTop+waveH-v/vMax*waveH;
+  let s="";
+  rows.forEach((r,i)=>{ if(!r.light){const x0=Math.max(L,x(i)-cw/2), x1=Math.min(W-R,x(i)+cw/2);
+    s+=`<rect x="${x0}" y="${top}" width="${x1-x0+0.5}" height="${vTop+waveH-top}" fill="var(--night)"/>`;}});
+  rows.forEach((r,i)=>{ if(hourNum(r.t)===0){
+    s+=`<line x1="${x(i)}" x2="${x(i)}" y1="${top-22}" y2="${vTop+waveH}" stroke="var(--muted)" stroke-dasharray="2 3" stroke-width="1"/>`;
+    s+=`<text x="${x(i)+4}" y="${top-12}" font-size="12" font-weight="600" fill="var(--ink)">${r.t.toLocaleDateString("da-DK",{timeZone:TZ,weekday:"short",day:"numeric"})}</text>`;}});
+  for(let v=0;v<=wMax;v+=4){s+=`<line x1="${L}" x2="${W-R}" y1="${yW(v)}" y2="${yW(v)}" stroke="var(--line)"/><text x="${L-8}" y="${yW(v)+4}" text-anchor="end" font-size="11" fill="var(--muted)">${v}</text>`;}
+  s+=`<text x="${L-8}" y="${top-12}" text-anchor="end" font-size="11" fill="var(--muted)">m/s</text>`;
+  s+=`<path d="M${rows.map((r,i)=>x(i)+","+yW(r.gust??r.wind)).join(" L")} L${rows.slice().reverse().map((r,j)=>x(N-1-j)+","+yW(r.wind)).join(" L")} Z" fill="var(--gust)" opacity=".7"/>`;
+  s+=`<path d="M${rows.map((r,i)=>x(i)+","+yW(r.wind)).join(" L")}" fill="none" stroke="var(--wind)" stroke-width="2.2" stroke-linejoin="round"/>`;
+  rows.forEach((r,i)=>{ if(i%3===0){ const ay=yW(r.wind)-14;
+    s+=`<g transform="translate(${x(i)},${Math.max(top+6,ay)}) rotate(${r.wdir+180})"><path d="M0 -6 L4 3 L0 1 L-4 3 Z" fill="var(--wind)"/></g>`;}});
+  s+=`<circle cx="${x(0)}" cy="${yW(rows[0].wind)}" r="4" fill="var(--wind)"/>`;
+  for(let k=0;k<=Math.round(vMax/vStep);k++){const v=+(k*vStep).toFixed(2);
+    s+=`<line x1="${L}" x2="${W-R}" y1="${yV(v)}" y2="${yV(v)}" stroke="var(--line)"/><text x="${L-8}" y="${yV(v)+4}" text-anchor="end" font-size="11" fill="var(--muted)">${dk(v)}</text>`;}
+  s+=`<text x="${W-R+6}" y="${yV(0)+4}" font-size="11" fill="var(--muted)">m</text>`;
+  s+=`<path d="M${x(0)},${yV(0)} L${rows.map((r,i)=>x(i)+","+yV(r.wave)).join(" L")} L${x(N-1)},${yV(0)} Z" fill="var(--wavefill)"/>`;
+  s+=`<path d="M${rows.map((r,i)=>x(i)+","+yV(r.wave)).join(" L")}" fill="none" stroke="var(--wave)" stroke-width="2" stroke-linejoin="round"/>`;
+  rows.forEach((r,i)=>{const h=hourNum(r.t); if(h%6===0){s+=`<text x="${x(i)}" y="${vTop+waveH+18}" text-anchor="middle" font-size="11" fill="var(--muted)">${String(h).padStart(2,"0")}</text>`;}});
+  s+=`<text x="${x(0)}" y="${top+windH+18}" font-size="11" font-weight="600" fill="var(--wind)">nu</text>`;
+  svg.innerHTML=s;
+  document.getElementById("charttitle").textContent="Næste "+N+" timer";
+  document.getElementById("chartsec").hidden=false;
+}
+
+function renderTable(rows){
+  const tb=document.querySelector("#log tbody"); let last="", h="";
+  rows.forEach(r=>{
+    const k=dayKey(r.t);
+    if(k!==last){last=k; h+=`<tr class="day"><td colspan="9">${cap(fDay(r.t))}<span class="sun">Sol op ${fHour(r.sun.rise)} · ned ${fHour(r.sun.set)}</span></td></tr>`;}
+    const sh=shore(r.wdir);
+    h+=`<tr><td>${fHour(r.t)}</td><td>${dk(r.wind)}</td><td>${dk(r.gust)}</td>
+      <td class="dir">${arrow(r.wdir,14,"var(--wind)")} ${comp(r.wdir)} <span class="pill ${sh[0]}" style="margin-left:4px">${sh[1]}</span></td>
+      <td>${dk(r.wave)} m</td><td class="dir">${comp(r.vdir)}</td><td>${dk(r.water)}°</td>
+      <td>${dk(r.air)}°${Math.abs(r.feel-r.air)>=1?' <span class="sub">(føles '+dk(r.feel)+'°)</span>':""}</td>
+      <td class="wx">${symName(r.sym)}${r.rain>0?" · "+dk(r.rain)+" mm":""}</td></tr>`;
+  });
+  tb.innerHTML=h;
+  document.getElementById("tablesec").hidden=false;
+}
+
+let lastOk=null;
+async function load(){
+  const status=document.getElementById("status"), stamp=document.getElementById("stamp");
+  try{
+    const [loc,sea]=await Promise.all([getJSON(LOC_URL),getJSON(SEA_URL)]);
+    const rows=buildRows(loc,sea);
+    if(rows.length<2) throw new Error("for få timer i prognosen");
+    renderNow(rows[0]); renderChart(rows); renderTable(rows);
+    lastOk=new Date();
+    const upd=new Date(loc.properties.meta.updated_at);
+    stamp.innerHTML=`Prognose fra MET Norway ${fDay(upd)} kl. ${fHour(upd)}<br>Hentet kl. ${fHour(lastOk)}`;
+    status.hidden=true;
+  }catch(e){
+    status.hidden=false; status.className="status err";
+    status.textContent=lastOk
+      ? `Kunne ikke hente en ny prognose. Tallene nedenfor er fra kl. ${fHour(lastOk)}.`
+      : "Prognosen kunne ikke hentes fra MET Norway lige nu. Prøv at genindlæse siden om lidt.";
+    if(!lastOk) stamp.textContent="";
+    console.error(e);
+  }
+}
+load();
+setInterval(load,30*60*1000);
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden&&lastOk&&Date.now()-lastOk>15*60*1000) load(); });
+})();
+</script>
+</body>
+</html>
